@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企業授信覆審 AI Agent</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Microsoft JhengHei', 'PingFang TC', -apple-system, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  .navbar {
+    background: rgba(15, 23, 42, 0.95);
+    border-bottom: 1px solid #334155;
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(8px);
+  }
+  .navbar .logo { font-size: 20px; font-weight: bold; color: #60a5fa; }
+  .navbar .logo-icon { font-size: 24px; margin-right: 8px; }
+  .navbar .tabs { display: flex; gap: 8px; }
+  .tab-btn {
+    background: transparent;
+    color: #94a3b8;
+    border: 1px solid transparent;
+    padding: 8px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: #e2e8f0; background: #1e293b; }
+  .tab-btn.active { background: #3b82f6; color: white; }
+
+  .container { max-width: 1300px; margin: 0 auto; padding: 32px; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: fadeIn 0.3s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .hero {
+    text-align: center;
+    padding: 40px 0 32px 0;
+  }
+  .hero h1 { font-size: 36px; margin-bottom: 12px; color: #f1f5f9; }
+  .hero p { color: #94a3b8; font-size: 16px; max-width: 720px; margin: 0 auto; }
+
+  .upload-card {
+    background: rgba(30, 41, 59, 0.8);
+    border: 2px dashed #475569;
+    border-radius: 12px;
+    padding: 48px 32px;
+    text-align: center;
+    margin: 24px 0;
+    transition: all 0.2s;
+  }
+  .upload-card:hover, .upload-card.drag-over {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+  }
+  .upload-icon { font-size: 56px; margin-bottom: 16px; }
+  .upload-text { font-size: 16px; color: #cbd5e1; margin-bottom: 8px; }
+  .upload-hint { font-size: 13px; color: #64748b; }
+  .upload-btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 6px;
+    font-size: 15px;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: all 0.2s;
+  }
+  .upload-btn:hover { background: #2563eb; transform: translateY(-1px); }
+  .upload-btn:disabled { background: #475569; cursor: not-allowed; transform: none; }
+
+  .demo-btn-row { display: flex; gap: 12px; justify-content: center; margin-top: 24px; flex-wrap: wrap; }
+  .demo-btn {
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  .demo-btn:hover { background: #334155; border-color: #3b82f6; }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    display: none;
+  }
+  .loading.show { display: block; }
+  .spinner {
+    border: 3px solid #334155;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .results { margin-top: 24px; }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: rgba(30, 41, 59, 0.9);
+    border-left: 4px solid #3b82f6;
+    border-radius: 8px;
+    padding: 20px 24px;
+  }
+  .stat-card.danger { border-left-color: #ef4444; }
+  .stat-card.warning { border-left-color: #f59e0b; }
+  .stat-card.success { border-left-color: #10b981; }
+  .stat-card .label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card .value { font-size: 28px; font-weight: bold; color: #f1f5f9; margin-top: 6px; }
+  .stat-card .sub { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+
+  .section-card {
+    background: rgba(30, 41, 59, 0.9);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+  }
+  .section-card h3 { font-size: 18px; color: #60a5fa; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #334155; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #334155; }
+  th { color: #94a3b8; font-size: 13px; font-weight: 600; background: rgba(15, 23, 42, 0.5); }
+  td { color: #e2e8f0; font-size: 14px; }
+  tr:hover td { background: rgba(59, 130, 246, 0.05); }
+
+  .flag-item {
+    background: rgba(15, 23, 42, 0.5);
+    border-left: 4px solid;
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+  }
+  .flag-item.high { border-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+  .flag-item.medium { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+  .flag-item .title { font-weight: bold; color: #f1f5f9; margin-bottom: 4px; }
+  .flag-item .desc { color: #cbd5e1; font-size: 13px; margin: 4px 0; }
+  .flag-item .action { color: #60a5fa; font-size: 13px; font-style: italic; }
+
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 8px;
+  }
+  .badge-A { background: #10b981; color: white; }
+  .badge-B { background: #3b82f6; color: white; }
+  .badge-C { background: #f59e0b; color: white; }
+  .badge-D { background: #f97316; color: white; }
+  .badge-E { background: #ef4444; color: white; }
+
+  .action-bar { display: flex; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
+  .action-btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .action-btn.secondary { background: #475569; }
+  .action-btn:hover { background: #2563eb; }
+
+  .report-frame { width: 100%; height: 800px; border: 1px solid #334155; border-radius: 8px; background: white; }
+
+  /* 比較頁樣式 */
+  .comparison-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .metric-card {
+    background: rgba(30, 41, 59, 0.9);
+    border-radius: 8px;
+    padding: 20px 24px;
+    text-align: center;
+  }
+  .metric-card .label { color: #94a3b8; font-size: 12px; text-transform: uppercase; }
+  .metric-card .value { color: #60a5fa; font-size: 32px; font-weight: bold; margin: 8px 0; }
+  .metric-card .unit { color: #94a3b8; font-size: 14px; }
+  .metric-card.success .value { color: #10b981; }
+  .metric-card.warning .value { color: #f59e0b; }
+  .metric-card.danger .value { color: #ef4444; }
+
+  .comparison-table { margin: 20px 0; }
+  .comparison-table .status-match { color: #10b981; }
+  .comparison-table .status-mismatch { color: #ef4444; }
+  .comparison-table .status-missing { color: #f59e0b; }
+
+  .bar-chart { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+  .bar-chart .label { width: 120px; color: #cbd5e1; font-size: 13px; }
+  .bar-chart .bar { background: #334155; height: 24px; border-radius: 4px; flex: 1; position: relative; overflow: hidden; }
+  .bar-chart .bar-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); border-radius: 4px; }
+  .bar-chart .bar-value { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: white; font-size: 12px; font-weight: bold; }
+
+  .architecture {
+    background: rgba(15, 23, 42, 0.5);
+    padding: 24px;
+    border-radius: 8px;
+    margin: 20px 0;
+  }
+  .arch-step {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 12px 0;
+  }
+  .arch-num {
+    background: #3b82f6;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+  .arch-content { flex: 1; color: #cbd5e1; }
+  .arch-content strong { color: #f1f5f9; }
+
+  .error { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #fecaca; padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo"><span class="logo-icon">🏦</span>企業授信覆審 AI Agent</div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="analyze">📊 個案分析</button>
+    <button class="tab-btn" data-tab="demo">🎯 示範案例</button>
+    <button class="tab-btn" data-tab="comparison">⚖️ AI vs 人工比較</button>
+    <button class="tab-btn" data-tab="architecture">🏗️ 系統架構</button>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Tab 1: 個案分析 -->
+  <div id="tab-analyze" class="tab-content active">
+    <div class="hero">
+      <h1>📋 企業授信覆審 AI 助手</h1>
+      <p>上傳企業財報（PDF / Excel / CSV），AI 自動萃取關鍵財務數據、計算比率、偵測異常、生成完整覆審報告</p>
+    </div>
+
+    <div class="upload-card" id="uploadCard">
+      <div class="upload-icon">📤</div>
+      <div class="upload-text">拖曳財報至此 或 點擊下方按鈕選擇檔案</div>
+      <div class="upload-hint">支援格式：PDF、Excel (.xlsx, .xls)、CSV、TXT</div>
+      <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv,.txt" style="display:none">
+      <button class="upload-btn" onclick="document.getElementById('fileInput').click()">選擇檔案</button>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div>AI 正在分析財報中，請稍候...</div>
+    </div>
+
+    <div class="error" id="error" style="display:none"></div>
+
+    <div class="results" id="results" style="display:none">
+      <h2 style="margin: 24px 0 16px; color: #f1f5f9;">📈 分析結果</h2>
+      <div class="action-bar">
+        <button class="action-btn" onclick="openReport()">🌐 開啟完整 HTML 報告</button>
+        <button class="action-btn secondary" onclick="downloadJson()">💾 下載 JSON 結果</button>
+      </div>
+      <div id="resultsContent"></div>
+    </div>
+  </div>
+
+  <!-- Tab 2: 示範案例 -->
+  <div id="tab-demo" class="tab-content">
+    <div class="hero">
+      <h1>🎯 示範案例</h1>
+      <p>三種風險等級的代表性企業案例，立即體驗 AI 授信分析的完整產出</p>
+    </div>
+    <div class="demo-btn-row">
+      <button class="demo-btn" onclick="loadDemoCase('strong')">🟢 A級：穩健企業</button>
+      <button class="demo-btn" onclick="loadDemoCase('medium')">🟡 B級：中等企業</button>
+      <button class="demo-btn" onclick="loadDemoCase('weak')">🔴 C級：高風險企業</button>
+    </div>
+    <div class="loading" id="demoLoading">
+      <div class="spinner"></div>
+      <div>載入示範案例...</div>
+    </div>
+    <div class="results" id="demoResults" style="display:none">
+      <div id="demoContent"></div>
+    </div>
+  </div>
+
+  <!-- Tab 3: AI vs 人工比較 -->
+  <div id="tab-comparison" class="tab-content">
+    <div class="hero">
+      <h1>⚖️ AI vs 人工分析差異</h1>
+      <p>量化 AI 自動分析與人工覆核的品質差異，驗證 hallucination 控制</p>
+    </div>
+    <div class="loading" id="comparisonLoading">
+      <div class="spinner"></div>
+      <div>載入比較資料...</div>
+    </div>
+    <div id="comparisonContent" style="display:none">
+      <div class="section-card" id="comparisonSummary"></div>
+      <div id="comparisonCases"></div>
+    </div>
+  </div>
+
+  <!-- Tab 4: 系統架構 -->
+  <div id="tab-architecture" class="tab-content">
+    <div class="hero">
+      <h1>🏗️ 系統架構與設計理念</h1>
+      <p>「確定性 Pipeline + 模板化敘述」設計，徹底避免 LLM 對財務數字產生幻覺</p>
+    </div>
+
+    <div class="section-card">
+      <h3>🤖 AI Agent 處理流程（5 步驟）</h3>
+      <div class="architecture">
+        <div class="arch-step">
+          <div class="arch-num">1</div>
+          <div class="arch-content">
+            <strong>財報解析</strong>：PDF/Excel/CSV → 標準化財務資料（pdfplumber + 啟發式關鍵字對應）
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-num">2</div>
+          <div class="arch-content">
+            <strong>比率計算</strong>：償債 / 流動 / 獲利 / 槓桿 / 成長 / 效率 — 純演算法公式
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-num">3</div>
+          <div class="arch-content">
+            <strong>異常偵測</strong>：Altman Z 分數 + 7 項規則式紅旗 + YoY 變動偵測
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-num">4</div>
+          <div class="arch-content">
+            <strong>健康評分</strong>：加權評分模型（償債 35% / 獲利 35% / 成長 15% / 效率 15%）
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-num">5</div>
+          <div class="arch-content">
+            <strong>報告生成</strong>：模板填空式 HTML 報告，所有結論對應具體數字
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h3>🛡️ 為何沒有 Hallucination？</h3>
+      <div class="architecture">
+        <div class="arch-step">
+          <div class="arch-num">✓</div>
+          <div class="arch-content">
+            <strong>數值層完全確定性</strong>：所有比率、Z 分數、紅旗皆由 Python 計算，無隨機性。
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-num">✓</div>
+          <div class="arch-content">
+            <strong>敘述層模板化</strong>：報告文字採用「if-else 模板 + 數字填空」，不呼叫 LLM 生成。
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-num">✓</div>
+          <div class="arch-content">
+            <strong>每句結論可追溯</strong>：報告中每個數字都對應到原始財報欄位，支援雙向驗證。
+          </div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-num">✓</div>
+          <div class="arch-content">
+            <strong>數字一致性檢查</strong>：自動比對 AI 萃取 vs 人工覆核的差異（&lt; 1% 為合格）。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h3>📦 技術棧</h3>
+      <div class="architecture">
+        <div class="arch-step"><div class="arch-num">🔧</div><div class="arch-content"><strong>後端</strong>：Python 3.11 + Flask + Pandas + pdfplumber + openpyxl</div></div>
+        <div class="arch-step"><div class="arch-num">🎨</div><div class="arch-content"><strong>前端</strong>：純 HTML/CSS/JS（零框架依賴，單檔部署）</div></div>
+        <div class="arch-step"><div class="arch-num">🧠</div><div class="arch-content"><strong>分析</strong>：確定性演算法 + 統計異常偵測（Z-score, 規則引擎）</div></div>
+        <div class="arch-step"><div class="arch-num">📊</div><div class="arch-content"><strong>報告</strong>：模板化 HTML 生成，支援 RAG 擴充</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// === 頁籤切換 ===
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+
+    if (btn.dataset.tab === 'comparison' && !document.getElementById('comparisonContent').style.display !== 'none') {
+      loadComparison();
+    }
+  });
+});
+
+// === 上傳與拖曳 ===
+const uploadCard = document.getElementById('uploadCard');
+const fileInput = document.getElementById('fileInput');
+
+uploadCard.addEventListener('dragover', (e) => { e.preventDefault(); uploadCard.classList.add('drag-over'); });
+uploadCard.addEventListener('dragleave', () => uploadCard.classList.remove('drag-over'));
+uploadCard.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadCard.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) {
+    analyzeFile(e.dataTransfer.files[0]);
+  }
+});
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length) analyzeFile(e.target.files[0]);
+});
+
+let currentResult = null;
+
+function analyzeFile(file) {
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('error').style.display = 'none';
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  fetch('/api/analyze', { method: 'POST', body: formData })
+    .then(r => r.json().then(d => ({ status: r.status, body: d })))
+    .then(({ status, body }) => {
+      document.getElementById('loading').classList.remove('show');
+      if (status !== 200) {
+        showError(body.error || '分析失敗');
+        return;
+      }
+      currentResult = body;
+      renderResult(body);
+    })
+    .catch(err => {
+      document.getElementById('loading').classList.remove('show');
+      showError('網路錯誤：' + err.message);
+    });
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = '❌ ' + msg;
+  el.style.display = 'block';
+}
+
+function fmtMoney(v) {
+  if (v === null || v === undefined) return 'N/A';
+  if (Math.abs(v) >= 1e8) return (v/1e8).toFixed(2) + ' 億';
+  if (Math.abs(v) >= 1e4) return (v/1e4).toFixed(0) + ' 萬';
+  return v.toFixed(0);
+}
+
+function fmtPct(v, digits=2) {
+  if (v === null || v === undefined) return 'N/A';
+  return (v * 100).toFixed(digits) + '%';
+}
+
+function fmtRatio(v, digits=2) {
+  if (v === null || v === undefined) return 'N/A';
+  return v.toFixed(digits);
+}
+
+function renderResult(r) {
+  const ratios = r.ratios || {};
+  const risk = r.risk_summary || {};
+  const flags = r.red_flags || [];
+  const altman = r.altman_z || {};
+  const is_ = r.parsed.income_statement || {};
+  const bs = r.parsed.balance_sheet || {};
+
+  const gradeLetter = (r.ratios.health_grade || 'C')[0];
+  const riskClass = risk.risk_level === 'high' ? 'danger' : (risk.risk_level === 'medium' ? 'warning' : 'success');
+
+  let html = `
+    <div class="summary-grid">
+      <div class="stat-card"><div class="label">公司名稱</div><div class="value" style="font-size:20px;">${r.company}</div><div class="sub">${r.period}</div></div>
+      <div class="stat-card ${riskClass}"><div class="label">整體風險</div><div class="value">${risk.risk_label || 'N/A'}</div><div class="sub">健康分數 ${ratios.health_score || 0}/100</div></div>
+      <div class="stat-card ${flags.filter(f => f.level === 'high').length > 0 ? 'danger' : 'success'}"><div class="label">高風險紅旗</div><div class="value">${flags.filter(f => f.level === 'high').length}</div><div class="sub">需立即關注</div></div>
+      <div class="stat-card ${flags.filter(f => f.level === 'medium').length > 0 ? 'warning' : 'success'}"><div class="label">中度警示</div><div class="value">${flags.filter(f => f.level === 'medium').length}</div><div class="sub">建議追蹤</div></div>
+    </div>
+
+    <div class="section-card">
+      <h3>📊 綜合評等 <span class="badge badge-${gradeLetter}">${ratios.health_grade || 'N/A'}</span></h3>
+      <p style="color:#cbd5e1; line-height:1.8;">${r.company} 經 AI 自動分析，綜合健康分數為 <strong style="color:#60a5fa;">${ratios.health_score}/100</strong>，
+      風險等級判定為 <strong>${risk.risk_label}</strong>，
+      Altman Z 分數為 <strong>${altman.score || 'N/A'}</strong>（${altman.zone_label || ''}）。</p>
+    </div>
+
+    <div class="section-card">
+      <h3>💰 財務數據摘要</h3>
+      <table>
+        <thead><tr><th>項目</th><th style="text-align:right;">金額</th><th>項目</th><th style="text-align:right;">金額</th></tr></thead>
+        <tbody>
+          <tr><td>營業收入</td><td style="text-align:right;">${fmtMoney(is_.revenue)}</td>
+              <td>資產總額</td><td style="text-align:right;">${fmtMoney(bs.total_assets)}</td></tr>
+          <tr><td>營業利益</td><td style="text-align:right;">${fmtMoney(is_.operating_income)}</td>
+              <td>負債總額</td><td style="text-align:right;">${fmtMoney(bs.total_liabilities)}</td></tr>
+          <tr><td>稅後淨利</td><td style="text-align:right;">${fmtMoney(is_.net_income)}</td>
+              <td>股東權益</td><td style="text-align:right;">${fmtMoney(bs.equity)}</td></tr>
+          <tr><td>現金水位</td><td style="text-align:right;">${fmtMoney(bs.cash)}</td>
+              <td>應收帳款</td><td style="text-align:right;">${fmtMoney(bs.accounts_receivable)}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-card">
+      <h3>📐 關鍵財務比率</h3>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
+        <div>
+          <h4 style="color:#60a5fa; margin-bottom:8px; font-size:14px;">償債能力</h4>
+          <table>
+            <tr><td>流動比</td><td style="text-align:right;">${fmtRatio(ratios.current_ratio)}</td></tr>
+            <tr><td>速動比</td><td style="text-align:right;">${fmtRatio(ratios.quick_ratio)}</td></tr>
+            <tr><td>負債比</td><td style="text-align:right;">${fmtPct(ratios.debt_ratio)}</td></tr>
+            <tr><td>利息保障倍數</td><td style="text-align:right;">${fmtRatio(ratios.interest_coverage)} 倍</td></tr>
+          </table>
+        </div>
+        <div>
+          <h4 style="color:#60a5fa; margin-bottom:8px; font-size:14px;">獲利能力</h4>
+          <table>
+            <tr><td>毛利率</td><td style="text-align:right;">${fmtPct(ratios.gross_margin)}</td></tr>
+            <tr><td>營業利益率</td><td style="text-align:right;">${fmtPct(ratios.operating_margin)}</td></tr>
+            <tr><td>淨利率</td><td style="text-align:right;">${fmtPct(ratios.net_margin)}</td></tr>
+            <tr><td>ROE</td><td style="text-align:right;">${fmtPct(ratios.roe)}</td></tr>
+            <tr><td>ROA</td><td style="text-align:right;">${fmtPct(ratios.roa)}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h3>🚩 紅旗警示（${flags.length} 項）</h3>
+      ${flags.length === 0 ? '<p style="color:#10b981;">✓ 目前未偵測到重大紅旗</p>' :
+        flags.map(f => `
+          <div class="flag-item ${f.level}">
+            <div class="title">[${f.code}] ${f.title} <span class="badge badge-${f.level === 'high' ? 'E' : 'C'}">${f.level === 'high' ? '高風險' : '中度警示'}</span></div>
+            <div class="desc">${f.description}</div>
+            <div class="action">💡 ${f.action}</div>
+          </div>
+        `).join('')}
+    </div>
+  `;
+
+  document.getElementById('resultsContent').innerHTML = html;
+  document.getElementById('results').style.display = 'block';
+}
+
+function openReport() {
+  if (currentResult && currentResult.html_path) {
+    const filename = currentResult.html_path.split('/').pop();
+    window.open('/api/report/' + filename, '_blank');
+  }
+}
+
+function downloadJson() {
+  if (currentResult && currentResult.json_path) {
+    const filename = currentResult.json_path.split('/').pop();
+    window.location.href = '/api/json/' + filename;
+  }
+}
+
+// === 示範案例 ===
+function loadDemoCase(type) {
+  document.getElementById('demoLoading').classList.add('show');
+  fetch('/api/demo')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('demoLoading').classList.remove('show');
+      const key = type === 'strong' ? 'case_a_strong' : (type === 'medium' ? 'case_b_medium' : 'case_c_weak');
+      const caseData = data[key];
+      currentResult = caseData;
+      // 加上 parsed 結構
+      caseData.parsed = caseData.parsed || {};
+      renderResult(caseData);
+      document.getElementById('demoResults').style.display = 'block';
+      // 加示範專屬按鈕
+      if (!document.getElementById('demoReportBtn')) {
+        const btn = document.createElement('button');
+        btn.id = 'demoReportBtn';
+        btn.className = 'action-btn';
+        btn.textContent = '🌐 開啟此示範完整報告';
+        btn.onclick = () => {
+          const filename = 'demo_' + caseData.company + '.html';
+          window.open('/api/report/' + filename, '_blank');
+        };
+        document.querySelector('#demoResults .action-bar')?.appendChild(btn);
+      }
+    });
+}
+
+// === 比較頁 ===
+function loadComparison() {
+  document.getElementById('comparisonLoading').classList.add('show');
+  fetch('/api/comparison')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('comparisonLoading').classList.remove('show');
+      document.getElementById('comparisonContent').style.display = 'block';
+
+      const s = data.summary;
+      document.getElementById('comparisonSummary').innerHTML = `
+        <h3>📊 整體品質指標</h3>
+        <div class="comparison-summary">
+          <div class="metric-card success"><div class="label">數字萃取準確率</div><div class="value">${s.avg_number_match_rate}</div><div class="unit">%</div></div>
+          <div class="metric-card success"><div class="label">紅旗精確率</div><div class="value">${s.avg_flag_precision}</div><div class="unit">%</div></div>
+          <div class="metric-card success"><div class="label">紅旗召回率</div><div class="value">${s.avg_flag_recall}</div><div class="unit">%</div></div>
+          <div class="metric-card ${s.avg_hallucination_rate < 5 ? 'success' : 'warning'}"><div class="label">Hallucination 率</div><div class="value">${s.avg_hallucination_rate}</div><div class="unit">%</div></div>
+          <div class="metric-card success"><div class="label">效率提升</div><div class="value">${s.avg_speedup}×</div><div class="unit">vs 人工</div></div>
+        </div>
+        <p style="color:#cbd5e1; line-height:1.8; margin-top:16px;">
+          <strong style="color:#f1f5f9;">📌 關鍵發現：</strong>
+          ① AI 數字萃取準確率達 ${s.avg_number_match_rate}%，證明從 PDF/Excel 抓取財務資料的高度可靠性。
+          ② 紅旗偵測精確率 ${s.avg_flag_precision}% / 召回率 ${s.avg_flag_recall}%，可作為人工覆審的優先檢查清單。
+          ③ Hallucination 率僅 ${s.avg_hallucination_rate}%，源於採用「確定性計算 + 模板化敘述」設計，每個結論皆對應到具體數字。
+          ④ 平均效率提升 ${s.avg_speedup} 倍，每份報告從 1 小時縮短到數秒。
+        </p>
+      `;
+
+      let casesHtml = '<h3 style="color:#f1f5f9; margin: 24px 0 16px;">📋 各案例詳細比較</h3>';
+      data.cases.forEach((c, i) => {
+        const grade = c.grade[0] || 'C';
+        casesHtml += `
+          <div class="section-card">
+            <h3>案例 ${i+1}：${c.company} <span class="badge badge-${grade}">${c.grade}</span></h3>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-bottom:20px;">
+              <div>
+                <h4 style="color:#60a5fa; font-size:14px; margin-bottom:8px;">數字準確率</h4>
+                <div class="bar-chart">
+                  <div class="bar"><div class="bar-fill" style="width:${c.number_accuracy.match_rate}%"></div><div class="bar-value">${c.number_accuracy.match_rate}%</div></div>
+                </div>
+                <p style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                  比對 ${c.number_accuracy.total_fields} 個欄位，${c.number_accuracy.matched} 項一致 / ${c.number_accuracy.mismatched} 項差異
+                </p>
+              </div>
+              <div>
+                <h4 style="color:#60a5fa; font-size:14px; margin-bottom:8px;">紅旗 F1 分數</h4>
+                <div class="bar-chart">
+                  <div class="bar"><div class="bar-fill" style="width:${c.flag_comparison.f1_score}%; background: linear-gradient(90deg, #10b981, #34d399);"></div><div class="bar-value">${c.flag_comparison.f1_score}</div></div>
+                </div>
+                <p style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                  AI: ${c.flag_comparison.ai_total} 項 ｜ 人工: ${c.flag_comparison.human_total} 項 ｜ 一致: ${c.flag_comparison.true_positive.length} 項
+                </p>
+              </div>
+              <div>
+                <h4 style="color:#60a5fa; font-size:14px; margin-bottom:8px;">效率提升</h4>
+                <div class="bar-chart">
+                  <div class="bar"><div class="bar-fill" style="width:${Math.min(c.efficiency.speedup_factor/10*100, 100)}%; background: linear-gradient(90deg, #f59e0b, #fbbf24);"></div><div class="bar-value">${c.efficiency.speedup_factor}×</div></div>
+                </div>
+                <p style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                  AI ${c.efficiency.ai_time_seconds}s vs 人工 ${Math.round(c.efficiency.human_time_seconds/60)} 分鐘
+                </p>
+              </div>
+            </div>
+
+            ${c.flag_comparison.false_positive.length > 0 ? `
+              <p style="color:#cbd5e1; font-size:13px;">⚠️ AI 過度警示：<span style="color:#f59e0b;">${c.flag_comparison.false_positive.join(', ')}</span></p>
+            ` : ''}
+            ${c.flag_comparison.false_negative.length > 0 ? `
+              <p style="color:#cbd5e1; font-size:13px;">⚠️ AI 漏判項目：<span style="color:#ef4444;">${c.flag_comparison.false_negative.join(', ')}</span></p>
+            ` : ''}
+            <p style="color:#94a3b8; font-size:12px; margin-top:8px;">
+              📊 報告中 ${c.hallucination_check.total_numbers_in_report} 個數字，${c.hallucination_check.verified_numbers} 個可追溯到原始資料，${c.hallucination_check.unverified_count} 個無法驗證
+            </p>
+          </div>
+        `;
+      });
+      document.getElementById('comparisonCases').innerHTML = casesHtml;
+    });
+}
+
+// 預設載入示範案例
+window.addEventListener('load', () => {
+  loadDemoCase('strong');
+});
+</script>
+</body>
+</html>
