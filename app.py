@@ -21,10 +21,10 @@ from backend.comparator import AIvsHumanComparator
 app = Flask(__name__, static_folder=str(Path(__file__).parent / 'frontend'), static_url_path='/static')
 CORS(app)
 
-UPLOAD_DIR = Path(__file__).parent.parent / 'data' / 'uploads'
+UPLOAD_DIR = Path(os.environ.get('UPLOAD_DIR', '/tmp/uploads'))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-REPORTS_DIR = Path(__file__).parent.parent / 'reports'
+REPORTS_DIR = Path(os.environ.get('REPORTS_DIR', '/tmp/reports'))
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXT = {'.pdf', '.xlsx', '.xls', '.csv', '.txt'}
